@@ -39,16 +39,19 @@ if st.button("Prepare Download", use_container_width=True):
             
         urls = url.split('\n') if download_mode == "Multiple Videos" else [url]
         
-        # --- THE 2026 ANTI-403 BYPASS ---
+        # --- THE 2026 ANTI-BOT BYPASS ---
         ydl_opts = {
             'outtmpl': f'{tmp_dir}/%(title)s.%(ext)s',
             'noplaylist': True,
+            # This section "Translates" the command you saw into Python
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web_embedded'],
+                    # 'ios' is the most trusted client by YouTube right now
+                    'player_client': ['ios', 'web_embedded'],
                 }
             },
-            'source_address': '0.0.0.0', 
+            # This makes the server look like a real Safari browser
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
         }
 
         if audio_only:
@@ -70,7 +73,7 @@ if st.button("Prepare Download", use_container_width=True):
             ydl_opts['force_keyframes_at_cuts'] = True
 
         try:
-            with st.spinner("Bypassing 403 restriction..."):
+            with st.spinner("Authenticating as Mobile Device..."):
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     for link in urls:
                         if link.strip():
@@ -78,7 +81,6 @@ if st.button("Prepare Download", use_container_width=True):
             
             st.success("Success!")
             
-            # --- FIXED SECTION ---
             files = glob.glob(f"{tmp_dir}/*")
             for f in files:
                 with open(f, "rb") as b:
@@ -90,3 +92,4 @@ if st.button("Prepare Download", use_container_width=True):
                     )
         except Exception as e:
             st.error(f"Error: {e}")
+            st.info("If it still says 'Sign in', YouTube has fully blocked this Cloud IP. Try again in 15 minutes or use a cookies.txt file.")
