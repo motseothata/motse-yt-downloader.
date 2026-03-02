@@ -7,8 +7,9 @@ import glob
 st.set_page_config(page_title="Motse Downloader", page_icon="📥")
 st.title("Motse Video Downloader Pro")
 
-# 1. Layout & Options
+# 1. Selection logic
 download_mode = st.radio("Download Mode:", ["Single Video", "Multiple Videos"], horizontal=True)
+
 col_a, col_q = st.columns(2)
 with col_a:
     audio_only = st.checkbox("🎵 Audio Only (MP3)")
@@ -26,19 +27,65 @@ if download_mode == "Single Video":
 else:
     url = st.text_area("Paste URLs (one per line):")
 
-# 2. The Download Engine
+# 2. Preparation Logic
 if st.button("Prepare Download", use_container_width=True):
     if not url:
-        st.error("Missing URL!")
+        st.error("Please provide a URL!")
     else:
         tmp_dir = "downloads_tmp"
-        if os.path.exists(tmp_dir): shutil.rmtree(tmp_dir)
+        if os.path.exists(tmp_dir):
+            shutil.rmtree(tmp_dir)
         os.makedirs(tmp_dir)
             
         urls = url.split('\n') if download_mode == "Multiple Videos" else [url]
         
-        # --- THE 2026 FIX FOR 403 FORBIDDEN ---
+        # --- THE CORRECTED DICTIONARY ---
         ydl_opts = {
             'outtmpl': f'{tmp_dir}/%(title)s.%(ext)s',
             'noplaylist': True,
-            # Workaround for YouTube
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['default', '-android_sdkless'],
+                    'skip': ['hls', 'dash']
+                }
+            }
+        }
+
+        if audio_only:
+            ydl_opts['format'] = 'bestaudio/best'
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192'
+            }]
+        else:
+            res = "2160" if quality == "Best" else quality.replace("p","")
+            ydl_opts['format'] = f'bestvideo[height<={res}][ext=mp4]+bestaudio[ext=m4a]/best[height<={res}][ext=mp4]/best'
+
+        if sub_mode == "Timeframe" and not audio_only:
+            def s(t):
+                p = t.split(':')
+                return int(p[0])*3600 + int(p[1])*60 + int(p[2])
+            ydl_opts['download_ranges'] = lambda info, dict: [{'start_time': s(start_t), 'end_time': s(end_t)}]
+            ydl_opts['force_keyframes_at_cuts'] = True
+
+        try:
+            with st.spinner("Bypassing YouTube restrictions..."):
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    for link in urls:
+                        if link.strip():
+                            ydl.download([link.strip()])
+            
+            st.success("Success! Click below to save.")
+            
+            files = glob.glob(f"{tmp_dir}/*")
+            for f in files:
+                with open(f, "rb") as b:
+                    st.download_button(
+                        label=f"💾 Download {os.path.basename(f)}",
+                        data=b,
+                        file_name=os.path.basename(f),
+                        use_container_width=True
+                    )
+        except Exception as e:
+            st.error(f"Error: {e}")
