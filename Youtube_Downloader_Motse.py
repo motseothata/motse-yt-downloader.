@@ -39,16 +39,18 @@ if st.button("Prepare Download", use_container_width=True):
             
         urls = url.split('\n') if download_mode == "Multiple Videos" else [url]
         
-        # --- THE CORRECTED DICTIONARY ---
+        # --- THE 2026 ANTI-403 BYPASS ---
         ydl_opts = {
             'outtmpl': f'{tmp_dir}/%(title)s.%(ext)s',
             'noplaylist': True,
+            # This 'web_embedded' client is the key to bypassing the 403 error in 2026
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['default', '-android_sdkless'],
-                    'skip': ['hls', 'dash']
+                    'player_client': ['web_embedded'],
                 }
-            }
+            },
+            # IPv4 is less likely to be blocked than IPv6
+            'source_address': '0.0.0.0', 
         }
 
         if audio_only:
@@ -59,7 +61,9 @@ if st.button("Prepare Download", use_container_width=True):
                 'preferredquality': '192'
             }]
         else:
-            res = "2160" if quality == "Best" else quality.replace("p","")
+            # Note: web_embedded sometimes limits quality to 720p/1080p 
+            # to prevent bot detection
+            res = "1080" if quality == "Best" else quality.replace("p","")
             ydl_opts['format'] = f'bestvideo[height<={res}][ext=mp4]+bestaudio[ext=m4a]/best[height<={res}][ext=mp4]/best'
 
         if sub_mode == "Timeframe" and not audio_only:
@@ -70,22 +74,11 @@ if st.button("Prepare Download", use_container_width=True):
             ydl_opts['force_keyframes_at_cuts'] = True
 
         try:
-            with st.spinner("Bypassing YouTube restrictions..."):
+            with st.spinner("Bypassing 403 restriction..."):
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     for link in urls:
                         if link.strip():
                             ydl.download([link.strip()])
             
-            st.success("Success! Click below to save.")
-            
-            files = glob.glob(f"{tmp_dir}/*")
-            for f in files:
-                with open(f, "rb") as b:
-                    st.download_button(
-                        label=f"💾 Download {os.path.basename(f)}",
-                        data=b,
-                        file_name=os.path.basename(f),
-                        use_container_width=True
-                    )
-        except Exception as e:
-            st.error(f"Error: {e}")
+            st.success("Success!")
+            for f in glob.glob(f"{
